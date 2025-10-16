@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Khaled - مدير المهام الصوتي</title>
+
+  <!-- Tailwind CDN (for quick styling) -->
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <!-- Three.js -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+
+  <!-- Custom styles -->
+  <link rel="stylesheet" href="style.css" />
+
+  <!-- Use system fonts or link Cairo if you prefer -->
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;600;700;800&display=swap');
+    body { font-family: 'Cairo', system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial; }
+  </style>
+</head>
+<body class="min-h-screen bg-gradient-to-b from-black via-[#1a0426] to-black text-white flex items-center justify-center p-4">
+
+  <!-- 3D background container -->
+  <div id="three-container" aria-hidden="true"></div>
+
+  <!-- Main app -->
+  <div class="app-container w-full max-w-3xl mx-auto p-6 rounded-2xl shadow-2xl border-2 border-gold overflow-hidden">
+    <header class="flex items-center justify-between mb-4">
+      <h1 class="text-2xl font-extrabold gold-text">Khaled — مدير المهام الصوتي</h1>
+      <div class="flex items-center gap-3">
+        <button id="themeToggle" title="Toggle theme" class="p-2 rounded-md border border-yellow-400 text-sm">Theme</button>
+      </div>
+    </header>
+
+    <!-- Voice panel -->
+    <section class="bg-transparent rounded-lg p-4 mb-6">
+      <div id="voice-status" class="text-yellow-300 font-semibold text-lg text-center mb-3">اضغط على الميكروفون لبدء مهمة جديدة.</div>
+
+      <div id="voice-preview" class="min-h-[5rem] p-3 rounded-md border border-yellow-500/30 bg-[#0b0410] text-right text-sm whitespace-pre-wrap">
+        <!-- preview -->
+      </div>
+
+      <div class="mt-4 flex items-center justify-center gap-4">
+        <button id="mic-button" class="w-20 h-20 rounded-full action-button bg-gold text-black flex items-center justify-center shadow-lg">
+          <!-- mic icon -->
+          <svg id="mic-icon" xmlns="http://www.w3.org/2000/svg" class="h-8 w-8" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M12 14a3 3 0 0 0 3-3V5a3 3 0 10-6 0v6a3 3 0 0 0 3 3z"></path>
+            <path d="M19 11a1 1 0 10-2 0 5 5 0 01-10 0 1 1 0 10-2 0 7 7 0 006 6.92V21a1 1 0 102 0v-3.08A7 7 0 0019 11z"></path>
+          </svg>
+        </button>
+
+        <button id="next-btn" class="hidden action-button px-5 py-3 rounded-lg bg-[#2e0854] border border-yellow-400 text-yellow-300 font-bold">التالي</button>
+        <button id="submit-btn" class="hidden action-button px-5 py-3 rounded-lg bg-green-600 text-white font-bold">تسجيل المهمة</button>
+      </div>
+
+      <div id="notes-confirmation" class="mt-4 flex justify-center gap-4 hidden">
+        <button id="confirm-yes" class="action-button px-4 py-2 bg-green-500 rounded-lg font-bold">نعم</button>
+        <button id="confirm-no" class="action-button px-4 py-2 bg-red-500 rounded-lg font-bold">لا</button>
+      </div>
+    </section>
+
+    <!-- Tasks list -->
+    <section>
+      <div class="flex items-center justify-between mb-3">
+        <h2 class="text-lg font-bold gold-text">قائمة المهام</h2>
+        <div class="flex gap-2">
+          <button id="refreshBtn" class="px-3 py-1 rounded-md border border-yellow-400 text-sm">تحديث</button>
+          <button id="clearLocal" class="px-3 py-1 rounded-md border border-red-400 text-sm">مسح محلي</button>
+        </div>
+      </div>
+
+      <div id="tasks-list" class="space-y-3 min-h-[8rem] max-h-[36vh] overflow-y-auto pr-2">
+        <p class="text-center text-gray-400" id="loading-message">...جارِ تحميل المهام</p>
+      </div>
+    </section>
+  </div>
+
+  <!-- Edit Modal -->
+  <div id="edit-modal" class="fixed inset-0 bg-black bg-opacity-70 hidden items-center justify-center p-4 z-50">
+    <div class="bg-[#120313] p-6 rounded-xl w-full max-w-md border-2 border-yellow-500">
+      <h3 class="text-xl font-bold gold-text mb-4 text-center">تعديل المهمة</h3>
+      <form id="edit-form" class="space-y-4">
+        <div>
+          <label class="block text-sm font-medium gold-text">اسم المهمة</label>
+          <input id="edit-name" type="text" required class="mt-1 w-full p-2 rounded-md bg-transparent border border-yellow-500/40 text-white"/>
+        </div>
+        <div class="flex gap-2">
+          <div class="flex-1">
+            <label class="block text-sm font-medium gold-text">التاريخ</label>
+            <input id="edit-date" type="date" required class="mt-1 w-full p-2 rounded-md bg-transparent border border-yellow-500/40 text-white"/>
+          </div>
+          <div style="min-width:120px;">
+            <label class="block text-sm font-medium gold-text">الوقت</label>
+            <input id="edit-time" type="time" required class="mt-1 w-full p-2 rounded-md bg-transparent border border-yellow-500/40 text-white"/>
+          </div>
+        </div>
+        <div>
+          <label class="block text-sm font-medium gold-text">الملاحظات</label>
+          <textarea id="edit-notes" rows="3" class="mt-1 w-full p-2 rounded-md bg-transparent border border-yellow-500/40 text-white"></textarea>
+        </div>
+        <div class="flex justify-end gap-3">
+          <button type="submit" class="px-4 py-2 rounded-lg bg-gold text-black font-bold">حفظ</button>
+          <button id="close-modal" type="button" class="px-4 py-2 rounded-lg bg-gray-700 text-white">إلغاء</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Script (module) -->
+  <script type="module" src="script.js"></script>
+</body>
+</html>
