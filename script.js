@@ -42,10 +42,22 @@ async function initApp() {
   const editForm = document.getElementById('edit-form');
   const closeModalBtn = document.getElementById('close-modal');
   const refreshBtn = document.getElementById('refreshBtn');
+  const testVoiceBtn = document.getElementById('test-voice-btn');
 
   const GOLD = "#FFD700";
   const KHALED_NAME = "أستاذ خالد";
   const ARABIC_MONTHS = ['يناير','فبراير','مارس','أبريل','مايو','يونيو','يوليو','أغسطس','سبتمبر','أكتوبر','نوفمبر','ديسمبر'];
+
+  // التحقق من دعم المتصفح
+  function checkBrowserSupport() {
+    const Recognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!Recognition) {
+      voiceStatus.textContent = '⚠️ المتصفح لا يدعم التعرف على الصوت. استخدم Chrome أو Edge.';
+      micButton.disabled = true;
+      return false;
+    }
+    return true;
+  }
 
   // Three.js Background
   function initThreeJS() {
@@ -89,9 +101,9 @@ async function initApp() {
   }
   initThreeJS();
 
-  // Voice Recognition
-  const Recognition = window.SpeechRecognition || window.webkitSpeechRecognition || null;
-  let recognition = Recognition ? new Recognition() : null;
+  // Voice Recognition - الإصدار المحسن
+  const Recognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+  let recognition = null;
   let isListening = false;
   let recognitionState = 'IDLE';
   let currentTask = {};
@@ -100,12 +112,12 @@ async function initApp() {
   let tasksInMemory = [];
 
   const statusMessages = {
-    IDLE: 'اضغط على الميكروفون لبدء مهمة جديدة.',
-    AWAITING_TASK_NAME: 'قل اسم المهمة، ثم اضغط التالي.',
-    AWAITING_DATE_TIME: 'قل اليوم، والشهر والوقت (مثال: 15 أكتوبر الساعة 8 مساءً)، ثم اضغط التالي.',
-    AWAITING_NOTES_CONFIRM: 'هل تريد إضافة ملاحظات؟ اضغط نعم أو لا.',
-    AWAITING_NOTES: 'قل الملاحظات، ثم اضغط تسجيل المهمة.',
-    PROCESSING: 'جارِ معالجة الإدخال...'
+    IDLE: '🎤 اضغط على الميكروفون لبدء مهمة جديدة (يجب استخدام Chrome أو Edge)',
+    AWAITING_TASK_NAME: '🎙️ قل اسم المهمة الآن...',
+    AWAITING_DATE_TIME: '📅 قل التاريخ والوقت (مثال: غداً الساعة 3 عصراً)...',
+    AWAITING_NOTES_CONFIRM: '📝 هل تريد إضافة ملاحظات؟',
+    AWAITING_NOTES: '🗒️ قل ملاحظاتك الآن...',
+    PROCESSING: '⚡ جارِ معالجة الإدخال...'
   };
 
   function setStatus(state, preview = '') {
@@ -118,32 +130,91 @@ async function initApp() {
     notesConfirmation.classList.toggle('hidden', state !== 'AWAITING_NOTES_CONFIRM');
   }
 
+  // تهيئة التعرف على الصوت
+  if (Recognition) {
+    recognition = new Recognition();
+    recognition.continuous = false;
+    recognition.interimResults = false;
+    recognition.lang = 'ar-SA'; // استخدام العربية السعودية (أكثر استقراراً)
+    recognition.maxAlternatives = 1;
+
+    recognition.onstart = () => {
+      console.log('🎤 بدء الاستماع...');
+      isListening = true;
+      micButton.classList.add('listening');
+    };
+
+    recognition.onresult = (event) => {
+      const transcript = event.results[0][0].transcript;
+      console.log('✅ تم التعرف:', transcript);
+      handleTranscript(transcript);
+    };
+
+    recognition.onerror = (event) => {
+      console.error('❌ خطأ في التعرف:', event.error);
+      isListening = false;
+      micButton.classList.remove('listening');
+      
+      let errorMessage = 'خطأ في الميكروفون: ';
+      switch(event.error) {
+        case 'not-allowed':
+        case 'permission-denied':
+          errorMessage = 'السماح باستخدام الميكروفون مطلوب. اضغط على أيقونة القفل في شريط العنوان واسمح بالوصول.';
+          break;
+        case 'network':
+          errorMessage = 'خطأ في الشبكة. تحقق من اتصال الإنترنت.';
+          break;
+        default:
+          errorMessage += event.error;
+      }
+      
+      setStatus('IDLE', errorMessage);
+    };
+
+    recognition.onend = () => {
+      console.log('🛑 انتهى الاستماع');
+      isListening = false;
+      micButton.classList.remove('listening');
+    };
+  } else {
+    voiceStatus.textContent = '⚠️ المتصفح لا يدعم التعرف على الصوت. استخدم Chrome أو Edge.';
+    micButton.disabled = true;
+  }
+
   function startRecognition(state) {
     if (!recognition) {
-      setStatus('IDLE', 'عذراً، متصفحك لا يدعم التعرف على الصوت.');
+      setStatus('IDLE', 'المتصفح لا يدعم التعرف على الصوت. استخدم Chrome أو Edge.');
       return;
     }
+
+    // إيقاف أي استماع سابق
+    if (isListening) {
+      recognition.stop();
+    }
+
     try {
-      recognition.lang = 'ar-EG';
-      recognition.interimResults = false;
-      recognition.continuous = false;
-      recognition.onresult = (ev) => {
-        const transcript = Array.from(ev.results).map(r => r[0].transcript).join(' ');
-        handleTranscript(transcript);
-      };
-      recognition.onend = () => {
-        isListening = false;
-      };
-      recognition.onerror = (err) => {
-        console.error('Speech error', err);
-        setStatus('IDLE', 'خطأ في الميكروفون. تحقق من الأذونات.');
-      };
+      // إعادة تعيين الإعدادات
+      recognition.lang = 'ar-SA';
       recognition.start();
-      isListening = true;
       setStatus(state);
-    } catch (e) {
-      console.error("startRecognition error:", e);
-      setStatus('IDLE', 'فشل بدء الميكروفون.');
+      
+      // إخفاء الزر بعد 60 ثانية كإجراء أمان
+      setTimeout(() => {
+        if (isListening) {
+          recognition.stop();
+          setStatus('IDLE', 'انتهى وقت الاستماع. اضغط على الميكروفون للمحاولة مرة أخرى.');
+        }
+      }, 60000);
+      
+    } catch (error) {
+      console.error('فشل بدء الميكروفون:', error);
+      
+      if (error.message.includes('already started')) {
+        recognition.stop();
+        setTimeout(() => startRecognition(state), 500);
+      } else {
+        setStatus('IDLE', 'فشل بدء الميكروفون. تأكد من السماح بالوصول إلى الميكروفون.');
+      }
     }
   }
 
@@ -358,17 +429,6 @@ async function initApp() {
         const idx = tasksInMemory.findIndex(t => t.id === id);
         if (idx !== -1) {
           tasksInMemory[idx] = { ...tasksInMemory[idx], ...payload };
-          renderTasks(tasksInMem// ... (الكود السابق يبقى كما هو)
-
-  async function updateTask(id, payload) {
-    try {
-      if (tasksCollectionRef) {
-        const docRef = doc(db, `artifacts/khaled_voice_tasks/users/${userId}/tasks`, id);
-        await updateDoc(docRef, payload);
-      } else {
-        const idx = tasksInMemory.findIndex(t => t.id === id);
-        if (idx !== -1) {
-          tasksInMemory[idx] = { ...tasksInMemory[idx], ...payload };
           renderTasks(tasksInMemory);
         }
       }
@@ -536,6 +596,11 @@ async function initApp() {
       renderTasks(tasksInMemory);
     }
     speakArabic('تم تحديث قائمة المهام');
+  });
+
+  // Test voice button
+  testVoiceBtn.addEventListener('click', () => {
+    speakArabic('هذا اختبار للصوت. إذا سمعت هذا، فالنظام يعمل بشكل صحيح.');
   });
 
   // Initialize Firebase and authentication
