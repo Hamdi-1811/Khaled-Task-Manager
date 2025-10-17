@@ -358,4 +358,212 @@ async function initApp() {
         const idx = tasksInMemory.findIndex(t => t.id === id);
         if (idx !== -1) {
           tasksInMemory[idx] = { ...tasksInMemory[idx], ...payload };
-          renderTasks(tasksInMem
+          renderTasks(tasksInMem// ... (الكود السابق يبقى كما هو)
+
+  async function updateTask(id, payload) {
+    try {
+      if (tasksCollectionRef) {
+        const docRef = doc(db, `artifacts/khaled_voice_tasks/users/${userId}/tasks`, id);
+        await updateDoc(docRef, payload);
+      } else {
+        const idx = tasksInMemory.findIndex(t => t.id === id);
+        if (idx !== -1) {
+          tasksInMemory[idx] = { ...tasksInMemory[idx], ...payload };
+          renderTasks(tasksInMemory);
+        }
+      }
+    } catch (e) {
+      console.error('Error updating task:', e);
+      alert('فشل تحديث المهمة: ' + e.message);
+    }
+  }
+
+  async function deleteTask(id) {
+    if (!confirm('هل أنت متأكد من حذف هذه المهمة؟')) return;
+    
+    try {
+      if (tasksCollectionRef) {
+        const docRef = doc(db, `artifacts/khaled_voice_tasks/users/${userId}/tasks`, id);
+        await deleteDoc(docRef);
+      } else {
+        tasksInMemory = tasksInMemory.filter(t => t.id !== id);
+        renderTasks(tasksInMemory);
+      }
+      speakArabic('تم حذف المهمة بنجاح');
+    } catch (e) {
+      console.error('Error deleting task:', e);
+      alert('فشل حذف المهمة: ' + e.message);
+    }
+  }
+
+  function renderTasks(tasks) {
+    if (!tasks.length) {
+      tasksList.innerHTML = '<p class="text-center text-gray-400">لا توجد مهام حالياً</p>';
+      return;
+    }
+
+    tasksList.innerHTML = tasks.map(task => `
+      <div class="task-item ${task.completed ? 'task-done' : ''}" data-id="${task.id}">
+        <div class="flex justify-between items-start gap-3">
+          <div class="flex gap-2">
+            <button class="complete-btn w-6 h-6 rounded-full border-2 ${task.completed ? 'bg-green-500 border-green-500' : 'border-gray-400'}" 
+                    title="${task.completed ? 'تم الانتهاء' : '标记完成'}">
+              ${task.completed ? '✓' : ''}
+            </button>
+            <button class="edit-btn text-blue-400 hover:text-blue-300" title="تعديل">✏️</button>
+            <button class="delete-btn text-red-400 hover:text-red-300" title="حذف">🗑️</button>
+          </div>
+          <div class="flex-1 text-right">
+            <h3 class="font-bold text-white ${task.completed ? 'line-through' : ''}">${task.name}</h3>
+            <p class="text-sm text-gray-300 mt-1">
+              📅 ${formatArabicDate(task.date)} 
+              ⏰ ${task.time}
+            </p>
+            ${task.notes ? `<p class="text-sm text-gray-400 mt-1">📝 ${task.notes}</p>` : ''}
+            <p class="text-xs text-gray-500 mt-1">
+              ${task.createdAt ? `أنشئت في: ${formatFirebaseTimestamp(task.createdAt)}` : ''}
+            </p>
+          </div>
+        </div>
+      </div>
+    `).join('');
+
+    // Add event listeners to task buttons
+    document.querySelectorAll('.complete-btn').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const taskId = btn.closest('.task-item').dataset.id;
+        const task = tasks.find(t => t.id === taskId);
+        if (task) {
+          updateTask(taskId, { completed: !task.completed });
+        }
+      });
+    });
+
+    document.querySelectorAll('.edit-btn').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const taskId = btn.closest('.task-item').dataset.id;
+        const task = tasks.find(t => t.id === taskId);
+        if (task) {
+          openEditModal(task);
+        }
+      });
+    });
+
+    document.querySelectorAll('.delete-btn').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const taskId = btn.closest('.task-item').dataset.id;
+        deleteTask(taskId);
+      });
+    });
+  }
+
+  function formatArabicDate(dateString) {
+    const date = new Date(dateString);
+    const day = date.getDate();
+    const month = ARABIC_MONTHS[date.getMonth()];
+    const year = date.getFullYear();
+    return `${day} ${month} ${year}`;
+  }
+
+  function formatFirebaseTimestamp(timestamp) {
+    if (!timestamp) return '';
+    
+    let date;
+    if (timestamp.toDate) {
+      date = timestamp.toDate();
+    } else if (timestamp instanceof Date) {
+      date = timestamp;
+    } else {
+      date = new Date(timestamp);
+    }
+    
+    return date.toLocaleString('ar-EG', {
+      weekday: 'long',
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  }
+
+  function openEditModal(task) {
+    document.getElementById('edit-name').value = task.name;
+    document.getElementById('edit-date').value = task.date;
+    document.getElementById('edit-time').value = task.time;
+    document.getElementById('edit-notes').value = task.notes || '';
+    
+    editModal.style.display = 'flex';
+    
+    // Store current task ID for form submission
+    editForm.dataset.editingTaskId = task.id;
+  }
+
+  editForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    
+    const taskId = editForm.dataset.editingTaskId;
+    const updatedData = {
+      name: document.getElementById('edit-name').value,
+      date: document.getElementById('edit-date').value,
+      time: document.getElementById('edit-time').value,
+      notes: document.getElementById('edit-notes').value
+    };
+    
+    await updateTask(taskId, updatedData);
+    closeEditModal();
+    speakArabic('تم تحديث المهمة بنجاح');
+  });
+
+  closeModalBtn.addEventListener('click', closeEditModal);
+  editModal.addEventListener('click', (e) => {
+    if (e.target === editModal) closeEditModal();
+  });
+
+  function closeEditModal() {
+    editModal.style.display = 'none';
+    editForm.reset();
+    delete editForm.dataset.editingTaskId;
+  }
+
+  refreshBtn.addEventListener('click', () => {
+    if (tasksCollectionRef) {
+      subscribeTasksRealtime();
+    } else {
+      renderTasks(tasksInMemory);
+    }
+    speakArabic('تم تحديث قائمة المهام');
+  });
+
+  // Initialize Firebase and authentication
+  initFirebaseAndAuth();
+
+  // Keyboard shortcuts
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+      if (editModal.style.display === 'flex') {
+        closeEditModal();
+      }
+      if (isListening && recognition) {
+        recognition.stop();
+        isListening = false;
+        setStatus('IDLE');
+      }
+    }
+    
+    // Space bar to toggle microphone
+    if (e.code === 'Space' && !e.target.matches('input, textarea')) {
+      e.preventDefault();
+      toggleMic();
+    }
+  });
+
+  // Welcome message
+  setTimeout(() => {
+    speakArabic(`مرحباً ${KHALED_NAME}، أنا مساعدك الصوتي لإدارة المهام. اضغط على الميكروفون أو مفتاح المسافة لبدء إضافة مهمة جديدة.`);
+  }, 1000);
+
+}
