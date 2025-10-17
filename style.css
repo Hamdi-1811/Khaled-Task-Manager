@@ -51,3 +51,39 @@ button, input, a {
   position: relative;
   z-index: 2;
 }
+
+/* === مؤشرات حالة الميكروفون === */
+#mic-button.listening {
+  animation: pulse 1.5s infinite;
+  background: #ff4444 !important;
+}
+
+@keyframes pulse {
+  0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(255, 68, 68, 0.7); }
+  70% { transform: scale(1.05); box-shadow: 0 0 0 15px rgba(255, 68, 68, 0); }
+  100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(255, 68, 68, 0); }
+}
+
+#mic-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* === تحسين التمرير === */
+#tasks-list::-webkit-scrollbar {
+  width: 6px;
+}
+
+#tasks-list::-webkit-scrollbar-track {
+  background: rgba(255, 215, 0, 0.1);
+  border-radius: 3px;
+}
+
+#tasks-list::-webkit-scrollbar-thumb {
+  background: var(--gold);
+  border-radius: 3px;
+}
+
+#tasks-list::-webkit-scrollbar-thumb:hover {
+  background: #e2b000;
+}
