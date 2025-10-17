@@ -5,27 +5,45 @@
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Khaled - مدير المهام الصوتي</title>
 
-  <!-- Tailwind CDN (for quick styling) -->
+  <!-- Tailwind CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
 
   <!-- Three.js -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 
-  <!-- Firebase CDN -->
-  <script src="https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js"></script>
+  <!-- Firebase v9 SDK - MODULAR -->
+  <script type="module">
+    import { initializeApp } from 'https://www.gstatic.com/firebasejs/9.22.0/firebase-app.js';
+    import { getAuth, signInAnonymously, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/9.22.0/firebase-auth.js';
+    import { getFirestore, collection, addDoc, updateDoc, deleteDoc, doc, query, orderBy, onSnapshot, serverTimestamp } from 'https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore.js';
+    
+    // Make Firebase modules available globally for script.js
+    window.firebaseModules = { 
+      initializeApp, 
+      getAuth, 
+      signInAnonymously, 
+      onAuthStateChanged, 
+      getFirestore, 
+      collection, 
+      addDoc, 
+      updateDoc, 
+      deleteDoc, 
+      doc, 
+      query, 
+      orderBy, 
+      onSnapshot, 
+      serverTimestamp 
+    };
+  </script>
 
   <!-- Custom styles -->
   <link rel="stylesheet" href="style.css" />
 
-  <!-- Use system fonts or link Cairo if you prefer -->
   <style>
     @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;600;700;800&display=swap');
-    body { font-family: 'Cairo', system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial; }
-    
-    /* Emergency click fix */
-    #three-container { pointer-events: none !important; }
+    body { 
+      font-family: 'Cairo', system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial; 
+    }
   </style>
 </head>
 <body class="min-h-screen bg-gradient-to-b from-black via-[#1a0426] to-black text-white flex items-center justify-center p-4">
@@ -37,30 +55,31 @@
   <div class="app-container w-full max-w-3xl mx-auto p-6 rounded-2xl shadow-2xl border-2 border-gold overflow-hidden">
     <header class="flex items-center justify-between mb-4">
       <h1 class="text-2xl font-extrabold gold-text">Khaled — مدير المهام الصوتي</h1>
-      <div class="flex items-center gap-3">
-        <button id="themeToggle" title="Toggle theme" class="p-2 rounded-md border border-yellow-400 text-sm">Theme</button>
-      </div>
     </header>
 
     <!-- Voice panel -->
     <section class="bg-transparent rounded-lg p-4 mb-6">
-      <div id="voice-status" class="text-yellow-300 font-semibold text-lg text-center mb-3">اضغط على الميكروفون لبدء مهمة جديدة.</div>
+      <div id="voice-status" class="text-yellow-300 font-semibold text-lg text-center mb-3">
+        اضغط على الميكروفون لبدء مهمة جديدة.
+      </div>
 
       <div id="voice-preview" class="min-h-[5rem] p-3 rounded-md border border-yellow-500/30 bg-[#0b0410] text-right text-sm whitespace-pre-wrap">
-        <!-- preview -->
       </div>
 
       <div class="mt-4 flex items-center justify-center gap-4">
         <button id="mic-button" class="w-20 h-20 rounded-full action-button bg-gold text-black flex items-center justify-center shadow-lg">
-          <!-- mic icon -->
-          <svg id="mic-icon" xmlns="http://www.w3.org/2000/svg" class="h-8 w-8" viewBox="0 0 24 24" fill="currentColor">
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8" viewBox="0 0 24 24" fill="currentColor">
             <path d="M12 14a3 3 0 0 0 3-3V5a3 3 0 10-6 0v6a3 3 0 0 0 3 3z"></path>
             <path d="M19 11a1 1 0 10-2 0 5 5 0 01-10 0 1 1 0 10-2 0 7 7 0 006 6.92V21a1 1 0 102 0v-3.08A7 7 0 0019 11z"></path>
           </svg>
         </button>
 
-        <button id="next-btn" class="hidden action-button px-5 py-3 rounded-lg bg-[#2e0854] border border-yellow-400 text-yellow-300 font-bold">التالي</button>
-        <button id="submit-btn" class="hidden action-button px-5 py-3 rounded-lg bg-green-600 text-white font-bold">تسجيل المهمة</button>
+        <button id="next-btn" class="hidden action-button px-5 py-3 rounded-lg bg-[#2e0854] border border-yellow-400 text-yellow-300 font-bold">
+          التالي
+        </button>
+        <button id="submit-btn" class="hidden action-button px-5 py-3 rounded-lg bg-green-600 text-white font-bold">
+          تسجيل المهمة
+        </button>
       </div>
 
       <div id="notes-confirmation" class="mt-4 flex justify-center gap-4 hidden">
@@ -75,7 +94,6 @@
         <h2 class="text-lg font-bold gold-text">قائمة المهام</h2>
         <div class="flex gap-2">
           <button id="refreshBtn" class="px-3 py-1 rounded-md border border-yellow-400 text-sm">تحديث</button>
-          <button id="clearLocal" class="px-3 py-1 rounded-md border border-red-400 text-sm">مسح محلي</button>
         </div>
       </div>
 
@@ -86,7 +104,7 @@
   </div>
 
   <!-- Edit Modal -->
-  <div id="edit-modal" class="fixed inset-0 bg-black bg-opacity-70 hidden items-center justify-center p-4 z-50">
+  <div id="edit-modal" class="fixed inset-0 bg-black bg-opacity-70 hidden items-center justify-center p-4 z-50" style="display: none;">
     <div class="bg-[#120313] p-6 rounded-xl w-full max-w-md border-2 border-yellow-500">
       <h3 class="text-xl font-bold gold-text mb-4 text-center">تعديل المهمة</h3>
       <form id="edit-form" class="space-y-4">
@@ -116,7 +134,7 @@
     </div>
   </div>
 
-  <!-- Script (regular, not module) -->
-  <script src="script.js"></script>
+  <!-- Main Script -->
+  <script type="module" src="script.js"></script>
 </body>
 </html>
