@@ -1,21 +1,3 @@
-/* Fix for clickable elements */
-#three-container {
-  pointer-events: none; /* This allows clicks to pass through to your app */
-  z-index: -1;
-}
-
-.app-container {
-  pointer-events: auto; /* This ensures your app content is clickable */
-  position: relative;
-  z-index: 1;
-}
-
-/* Ensure all interactive elements are clickable */
-button, input, a {
-  pointer-events: auto;
-  position: relative;
-  z-index: 2;
-}
 :root{
   --deep-purple: #2E0854;
   --black: #000000;
@@ -51,3 +33,21 @@ button, input, a {
 }
 .app-container .border { border-color: rgba(255, 215, 0, 0.12); }
 .bg-gold { background: var(--gold); }
+
+/* === FIX FOR CLICKABLE ELEMENTS - PUT THIS AT THE BOTTOM === */
+#three-container {
+  pointer-events: none !important;
+  z-index: -1;
+}
+
+.app-container {
+  pointer-events: auto;
+  position: relative;
+  z-index: 1;
+}
+
+button, input, a {
+  pointer-events: auto;
+  position: relative;
+  z-index: 2;
+}
